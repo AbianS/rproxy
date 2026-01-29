@@ -1,25 +1,50 @@
 use std::net::IpAddr;
 use std::sync::Arc;
+use std::time::Duration;
 
 use bytes::Bytes;
 use http_body_util::{BodyExt, Empty, Full, combinators::BoxBody};
 use hyper::body::Incoming;
-use hyper::client::conn::http1::Builder as Http1Builder;
 use hyper::{Request, Response, StatusCode};
-use hyper_util::rt::TokioIo;
-use tokio::net::TcpStream;
+use hyper_util::client::legacy::{Client, connect::HttpConnector};
+use hyper_util::rt::TokioExecutor;
 use tracing::{debug, error};
 
 use crate::config::Config;
 use crate::error::{ProxyError, Result};
 
+/// HTTP client with connection pooling
+type HttpClient = Client<HttpConnector, Incoming>;
+
 pub struct ProxyHandler {
     config: Arc<Config>,
+    client: HttpClient,
+    upstream_uri: String,
 }
 
 impl ProxyHandler {
     pub fn new(config: Arc<Config>) -> Result<Self> {
-        Ok(Self { config })
+        // Create HTTP connector with connection pooling
+        let mut connector = HttpConnector::new();
+        connector.set_nodelay(true);
+        connector.set_keepalive(Some(Duration::from_secs(60)));
+        connector.enforce_http(true);
+
+        // Build client with connection pool
+        let client = Client::builder(TokioExecutor::new())
+            .pool_idle_timeout(Duration::from_secs(60))
+            .pool_max_idle_per_host(256) // Keep many connections ready
+            .pool_timer(hyper_util::rt::TokioTimer::new())
+            .build(connector);
+
+        // Pre-build upstream URI
+        let upstream_uri = format!("http://{}", config.upstream.address);
+
+        Ok(Self {
+            config,
+            client,
+            upstream_uri,
+        })
     }
 
     pub async fn handle(
@@ -33,43 +58,37 @@ impl ProxyHandler {
         // Strip hop-by-hop headers
         self.strip_hop_by_hop_headers(&mut req);
 
-        // Connect to upstream with timeout
-        let upstream_addr = &self.config.upstream.address;
+        // Rewrite URI to upstream
+        let path_and_query = req
+            .uri()
+            .path_and_query()
+            .map(|pq| pq.as_str())
+            .unwrap_or("/");
+
+        let upstream_uri = format!("{}{}", self.upstream_uri, path_and_query);
+
+        *req.uri_mut() = upstream_uri
+            .parse()
+            .map_err(|e| ProxyError::UpstreamConnection(format!("Invalid URI: {}", e)))?;
+
+        // Update Host header
+        if let Ok(host) = self.config.upstream.address.parse() {
+            req.headers_mut().insert("host", host);
+        }
+
+        // Forward request using pooled connection
         let timeout_duration = self.config.upstream.timeout;
 
-        let stream = tokio::time::timeout(timeout_duration, TcpStream::connect(upstream_addr))
+        let response = tokio::time::timeout(timeout_duration, self.client.request(req))
             .await
             .map_err(|_| {
-                error!("Upstream connection timeout: {}", upstream_addr);
+                debug!("Upstream request timeout");
                 ProxyError::UpstreamTimeout
             })?
             .map_err(|e| {
-                error!("Failed to connect to upstream {}: {}", upstream_addr, e);
+                error!("Upstream request failed: {}", e);
                 ProxyError::UpstreamConnection(e.to_string())
             })?;
-
-        let io = TokioIo::new(stream);
-
-        // Create HTTP/1.1 connection
-        let (mut sender, conn) = Http1Builder::new()
-            .preserve_header_case(true)
-            .title_case_headers(false)
-            .handshake(io)
-            .await
-            .map_err(|e| ProxyError::UpstreamConnection(e.to_string()))?;
-
-        // Spawn connection handler
-        tokio::spawn(async move {
-            if let Err(e) = conn.await {
-                debug!("Upstream connection closed: {}", e);
-            }
-        });
-
-        // Forward request
-        let response = sender
-            .send_request(req)
-            .await
-            .map_err(|e| ProxyError::UpstreamConnection(e.to_string()))?;
 
         // Convert response body
         let (parts, body) = response.into_parts();
