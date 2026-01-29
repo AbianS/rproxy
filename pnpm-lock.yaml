@@ -75,6 +75,8 @@ importers:
 
   apps/server: {}
 
+  packages/benchmarks: {}
+
 packages:
 
   '@alloc/quick-lru@5.2.0':

@@ -1,5 +1,5 @@
 {
-  "name": "proxy",
+  "name": "rproxy-monorepo",
   "private": true,
   "scripts": {
     "ci": "turbo run test build lint format:check",

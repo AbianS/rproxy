@@ -1,6 +1,6 @@
 {
-  "name": "@proxy/server",
-  "version": "0.1.3",
+  "name": "rproxy",
+  "version": "0.1.0",
   "private": true,
   "scripts": {
     "build": "cargo build --release",
