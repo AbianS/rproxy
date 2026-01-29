@@ -53,34 +53,31 @@ impl MiddlewareStack {
         debug!("{} {} from {}", method, path, client_ip);
 
         // 1. Rate limiting
-        if self.config.rate_limit.enabled {
-            if !self.rate_limiter.check(client_ip) {
-                warn!("Rate limited: {} from {}", path, client_ip);
-                return Ok(text_response(
-                    StatusCode::TOO_MANY_REQUESTS,
-                    "Rate limit exceeded",
-                ));
-            }
+        if self.config.rate_limit.enabled && !self.rate_limiter.check(client_ip) {
+            warn!("Rate limited: {} from {}", path, client_ip);
+            return Ok(text_response(
+                StatusCode::TOO_MANY_REQUESTS,
+                "Rate limit exceeded",
+            ));
         }
 
         // 2. Path filtering
-        if self.config.filter.enabled {
-            if self.filter.is_blocked(&path) {
-                info!("Blocked path: {} from {}", path, client_ip);
-                return Ok(empty_response(StatusCode::NOT_FOUND));
-            }
+        if self.config.filter.enabled && self.filter.is_blocked(&path) {
+            info!("Blocked path: {} from {}", path, client_ip);
+            return Ok(empty_response(StatusCode::NOT_FOUND));
         }
 
         // 3. Check if WebSocket upgrade
-        if self.config.websocket.enabled && is_websocket_upgrade(&req) {
-            if self.is_websocket_path(&path) {
-                info!("WebSocket upgrade: {} from {}", path, client_ip);
-                match handle_websocket(req, self.config.clone()).await {
-                    Ok(response) => return Ok(response),
-                    Err(e) => {
-                        warn!("WebSocket error: {}", e);
-                        return Ok(empty_response(StatusCode::BAD_GATEWAY));
-                    }
+        if self.config.websocket.enabled
+            && is_websocket_upgrade(&req)
+            && self.is_websocket_path(&path)
+        {
+            info!("WebSocket upgrade: {} from {}", path, client_ip);
+            match handle_websocket(req, self.config.clone()).await {
+                Ok(response) => return Ok(response),
+                Err(e) => {
+                    warn!("WebSocket error: {}", e);
+                    return Ok(empty_response(StatusCode::BAD_GATEWAY));
                 }
             }
         }

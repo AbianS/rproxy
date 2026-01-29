@@ -52,6 +52,20 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 thiserror = "2"
 globset = "0.4"
 
+[dev-dependencies]
+# Test framework
+rstest = "0.24"
+serial_test = "3"
+tokio-test = "0.4"
+pretty_assertions = "1"
+tempfile = "3"
+
+# HTTP client for integration tests
+reqwest = { version = "0.12", features = ["json"] }
+
+# Test server
+wiremock = "0.6"
+
 [profile.release]
 opt-level = 3
 lto = true

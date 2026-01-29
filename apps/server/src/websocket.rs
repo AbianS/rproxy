@@ -217,7 +217,7 @@ mod sha1_smol {
             let mut d = self.state[3];
             let mut e = self.state[4];
 
-            for i in 0..80 {
+            for (i, &w_i) in w.iter().enumerate() {
                 let (f, k) = match i {
                     0..=19 => ((b & c) | ((!b) & d), 0x5A827999u32),
                     20..=39 => (b ^ c ^ d, 0x6ED9EBA1u32),
@@ -230,7 +230,7 @@ mod sha1_smol {
                     .wrapping_add(f)
                     .wrapping_add(e)
                     .wrapping_add(k)
-                    .wrapping_add(w[i]);
+                    .wrapping_add(w_i);
 
                 e = d;
                 d = c;
