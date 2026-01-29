@@ -1,0 +1,60 @@
+[package]
+name = "rproxy"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+description = "Minimal high-performance reverse proxy"
+license = "GPL-3.0"
+
+[dependencies]
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# HTTP server and client
+hyper = { version = "1", features = ["full"] }
+hyper-util = { version = "0.1", features = ["full", "tokio"] }
+http-body-util = "0.1"
+http = "1"
+bytes = "1"
+
+# Middleware
+tower = { version = "0.5", features = ["full"] }
+tower-http = { version = "0.6", features = [
+    "compression-br",
+    "compression-gzip",
+    "decompression-br",
+    "decompression-gzip",
+] }
+
+# TLS with ACME (Let's Encrypt)
+tokio-rustls = "0.26"
+rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
+rustls-pemfile = "2"
+tokio-rustls-acme = "0.7"
+tokio-stream = { version = "0.1", features = ["net"] }
+
+# WebSocket
+tokio-tungstenite = "0.26"
+
+# Rate limiting
+governor = "0.8"
+
+# Cache
+moka = { version = "0.12", features = ["future"] }
+
+# Async utils
+futures-util = "0.3"
+
+# Utils
+serde = { version = "1", features = ["derive"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+thiserror = "2"
+globset = "0.4"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
