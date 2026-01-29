@@ -3,6 +3,7 @@
 > **Context Architecture Note**: This is the **root context** file for the rproxy project.
 > For component-specific context, see:
 > - Server (Rust backend): `apps/server/CLAUDE.md`
+> - Documentation (Next.js): `apps/docs/CLAUDE.md`
 
 ## Project Vision
 

@@ -1,0 +1,172 @@
+---
+title: Architecture
+description: Technical architecture of rproxy
+---
+
+# Architecture
+
+rproxy is built on a modern Rust stack optimized for performance and minimal resource usage.
+
+## Tech Stack
+
+| Component | Technology |
+|-----------|------------|
+| **HTTP Server** | hyper 1.x + hyper-util |
+| **Async Runtime** | Tokio |
+| **TLS** | rustls + tokio-rustls-acme |
+| **Rate Limiting** | governor (token bucket) |
+| **Caching** | moka (async LRU cache) |
+| **Compression** | tower-http (Brotli + Gzip) |
+| **WebSocket** | tokio-tungstenite |
+
+## Request Flow
+
+```
+Client Request
+      │
+      ▼
+┌─────────────────────────────────────────────────────┐
+│                   TLS Layer                         │
+│          (rustls + tokio-rustls-acme)               │
+│         • Certificate management                    │
+│         • ALPN for HTTP/2                           │
+└───────────────────────┬─────────────────────────────┘
+                        │
+                        ▼
+┌─────────────────────────────────────────────────────┐
+│                  Rate Limiter                       │
+│                   (governor)                        │
+│         • Token bucket per IP                       │
+│         • Returns 429 if exceeded                   │
+└───────────────────────┬─────────────────────────────┘
+                        │
+                        ▼
+┌─────────────────────────────────────────────────────┐
+│                  Path Filter                        │
+│                   (globset)                         │
+│         • Block sensitive paths                     │
+│         • Returns 404 if blocked                    │
+└───────────────────────┬─────────────────────────────┘
+                        │
+                        ▼
+┌─────────────────────────────────────────────────────┐
+│                 WebSocket Check                     │
+│         • Detect Upgrade: websocket                 │
+│         • Route to WS handler if match              │
+└───────────────────────┬─────────────────────────────┘
+                        │
+          ┌─────────────┴─────────────┐
+          │                           │
+          ▼                           ▼
+   ┌─────────────┐           ┌─────────────┐
+   │  WebSocket  │           │   Cache     │
+   │  Passthrough│           │   Check     │
+   └─────────────┘           └──────┬──────┘
+                                    │
+                    ┌───────────────┴───────────────┐
+                    │                               │
+                    ▼                               ▼
+             ┌─────────────┐               ┌─────────────┐
+             │ Cache Hit   │               │ Cache Miss  │
+             │ Return      │               │ Forward     │
+             └─────────────┘               └──────┬──────┘
+                                                  │
+                                                  ▼
+                                     ┌────────────────────┐
+                                     │   Proxy Handler    │
+                                     │ • Connect upstream │
+                                     │ • Forward headers  │
+                                     │ • Stream response  │
+                                     └─────────┬──────────┘
+                                               │
+                                               ▼
+                                     ┌────────────────────┐
+                                     │  Security Headers  │
+                                     │ • HSTS             │
+                                     │ • X-Frame-Options  │
+                                     │ • CSP-ready        │
+                                     └─────────┬──────────┘
+                                               │
+                                               ▼
+                                          Response
+```
+
+## Module Structure
+
+```
+src/
+├── main.rs              # Entry point, logging
+├── config.rs            # ENV var parsing
+├── error.rs             # Error types
+├── server.rs            # HTTP server + TLS
+├── proxy.rs             # Request forwarding
+├── websocket.rs         # WS passthrough
+└── middleware/
+    ├── mod.rs           # Stack composition
+    ├── rate_limit.rs    # Token bucket
+    ├── cache.rs         # HTTP caching
+    ├── security.rs      # Headers
+    └── filter.rs        # Path blocking
+```
+
+## Connection Handling
+
+### HTTP/1.1 (Non-TLS)
+
+```rust
+http1::Builder::new()
+    .preserve_header_case(true)
+    .serve_connection(io, service)
+    .with_upgrades()  // Required for WebSocket
+```
+
+### HTTP/2 (TLS)
+
+```rust
+AutoBuilder::new(TokioExecutor::new())
+    .serve_connection_with_upgrades(io, service)
+```
+
+The `auto::Builder` automatically detects HTTP/1.1 or HTTP/2 via ALPN negotiation during TLS handshake.
+
+## TLS with ACME
+
+rproxy uses `tokio-rustls-acme` for automatic certificate management:
+
+1. On startup, check for existing certificates in cache directory
+2. If missing or expired, initiate ACME challenge
+3. Certificates are renewed automatically before expiration
+4. All certificates stored in `RPROXY_TLS_CACHE_DIR`
+
+```rust
+let acme_config = AcmeConfig::new(&domains)
+    .cache(DirCache::new(cache_dir))
+    .directory_lets_encrypt(true);
+```
+
+## Forwarding Headers
+
+rproxy adds standard forwarding headers:
+
+| Header | Value |
+|--------|-------|
+| `X-Forwarded-For` | Client IP (appended to existing) |
+| `X-Real-IP` | Client IP |
+| `X-Forwarded-Proto` | `https` or `http` |
+| `X-Forwarded-Host` | Original Host header |
+
+Hop-by-hop headers are stripped before forwarding:
+- `Connection`
+- `Keep-Alive`
+- `Proxy-Authenticate`
+- `Proxy-Authorization`
+- `TE`
+- `Trailer`
+- `Transfer-Encoding`
+
+## Performance Considerations
+
+- **Zero-copy streaming**: Response bodies are streamed without buffering
+- **Connection pooling**: HTTP/1.1 keep-alive supported
+- **Async I/O**: All operations are non-blocking via Tokio
+- **Memory-efficient caching**: moka uses LRU eviction with TTL

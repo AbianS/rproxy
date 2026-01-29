@@ -1,0 +1,138 @@
+---
+title: Installation
+description: How to install and run rproxy
+---
+
+# Installation
+
+rproxy can be run as a Docker container or as a standalone binary.
+
+## Docker (Recommended)
+
+The easiest way to run rproxy is with Docker:
+
+```bash
+docker run -d \
+  -p 80:80 \
+  -p 443:443 \
+  -e RPROXY_UPSTREAM=host.docker.internal:3000 \
+  -e RPROXY_TLS_DOMAINS=example.com \
+  -e RPROXY_TLS_EMAIL=admin@example.com \
+  -v rproxy-certs:/var/lib/rproxy/certs \
+  rproxy:latest
+```
+
+### Docker Compose
+
+For production deployments, use Docker Compose:
+
+```yaml filename="docker-compose.yml"
+services:
+  proxy:
+    image: rproxy:latest
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - RPROXY_UPSTREAM=app:3000
+      - RPROXY_TLS_DOMAINS=example.com,www.example.com
+      - RPROXY_TLS_EMAIL=admin@example.com
+      - RPROXY_RATE_LIMIT=100
+      - RPROXY_HSTS=true
+    volumes:
+      - certs:/var/lib/rproxy/certs
+    depends_on:
+      - app
+    restart: unless-stopped
+
+  app:
+    build: ./app
+    expose:
+      - "3000"
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+
+volumes:
+  certs:
+```
+
+## Binary
+
+Download the pre-built binary for your platform:
+
+```bash
+# Linux (x86_64)
+curl -L https://github.com/AbianS/rproxy/releases/latest/download/rproxy-linux-amd64 -o rproxy
+chmod +x rproxy
+
+# macOS (arm64)
+curl -L https://github.com/AbianS/rproxy/releases/latest/download/rproxy-darwin-arm64 -o rproxy
+chmod +x rproxy
+```
+
+Run it:
+
+```bash
+RPROXY_UPSTREAM=127.0.0.1:3000 \
+RPROXY_TLS_DOMAINS=example.com \
+./rproxy
+```
+
+## Build from Source
+
+Requirements:
+- Rust 1.85+
+- musl-dev (for static linking on Linux)
+
+```bash
+git clone https://github.com/AbianS/rproxy
+cd rproxy/apps/server
+
+# Development build
+cargo build
+
+# Release build (optimized)
+cargo build --release
+
+# The binary is at target/release/rproxy
+```
+
+### Static Binary (Linux)
+
+For a fully static binary with no dependencies:
+
+```bash
+rustup target add x86_64-unknown-linux-musl
+cargo build --release --target x86_64-unknown-linux-musl
+```
+
+## Development Mode
+
+For local development without TLS:
+
+```bash
+RPROXY_UPSTREAM=127.0.0.1:3000 \
+RPROXY_TLS_DOMAINS="" \
+cargo run
+```
+
+This runs on port 443 without TLS. You can also customize the port:
+
+```bash
+RPROXY_LISTEN=0.0.0.0:8080 \
+RPROXY_UPSTREAM=127.0.0.1:3000 \
+cargo run
+```
+
+## Verify Installation
+
+Check that rproxy is running:
+
+```bash
+curl -I http://localhost/
+```
+
+You should see response headers including security headers like:
+- `X-Content-Type-Options: nosniff`
+- `X-Frame-Options: DENY`

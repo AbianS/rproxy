@@ -1,0 +1,81 @@
+---
+title: Overview
+description: Introduction to rproxy - a minimal reverse proxy for self-hosted applications
+---
+
+# Overview
+
+**rproxy** is an ultra-lightweight, high-performance reverse proxy written in Rust. It's designed for self-hosted web applications running in Docker or VPS environments.
+
+## Why rproxy?
+
+When deploying web applications (Next.js, Express, Django, etc.), you typically need a reverse proxy to:
+
+- **Terminate TLS** - Handle HTTPS and certificates
+- **Add security headers** - HSTS, X-Frame-Options, etc.
+- **Rate limit** - Protect against abuse
+- **Filter paths** - Block access to sensitive files
+
+Traditional solutions like Nginx or Caddy work well, but they come with overhead:
+
+| Proxy | Memory | Binary Size |
+|-------|--------|-------------|
+| Nginx | ~50-100MB | ~1.5MB + config |
+| Caddy | ~30-50MB | ~40MB |
+| **rproxy** | **~10MB** | **~5MB** |
+
+## Features
+
+- **Auto TLS** - Let's Encrypt certificates with zero configuration
+- **HTTP/2** - Automatic protocol detection over TLS
+- **Rate Limiting** - Token bucket per IP address
+- **Security Headers** - HSTS, X-Frame-Options, CSP-ready
+- **Path Filtering** - Block .env, .git, and sensitive files
+- **WebSocket** - Full passthrough for HMR and real-time apps
+- **Single Binary** - No runtime dependencies
+
+## Architecture
+
+```
+┌─────────────────┐     ┌─────────────────────┐     ┌─────────────────┐
+│    Internet     │────▶│      rproxy         │────▶│    Your App     │
+│   (Clients)     │     │   (Rust/hyper)      │     │  (Next.js, etc) │
+└─────────────────┘     └─────────────────────┘     └─────────────────┘
+        │                         │
+        │                 ┌───────┴───────┐
+        │                 │  Middleware   │
+        │                 ├───────────────┤
+        └────────────────▶│ • TLS (ACME)  │
+                          │ • Rate Limit  │
+                          │ • Security    │
+                          │ • WebSocket   │
+                          └───────────────┘
+```
+
+## Quick Example
+
+```yaml filename="docker-compose.yml"
+services:
+  proxy:
+    image: rproxy:latest
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - RPROXY_UPSTREAM=app:3000
+      - RPROXY_TLS_DOMAINS=example.com
+      - RPROXY_TLS_EMAIL=admin@example.com
+    depends_on:
+      - app
+
+  app:
+    image: your-nextjs-app
+    expose:
+      - "3000"
+```
+
+## Next Steps
+
+- [Installation](/getting-started/installation) - Get rproxy running
+- [Configuration](/configuration/environment) - All environment variables
+- [Reference](/reference/architecture) - Technical deep-dive
