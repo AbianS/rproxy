@@ -1,0 +1,29 @@
+# Stress test benchmark scenario
+# Ramps up load until error threshold is reached
+
+name = "stress"
+description = "Ramp-up until 5% error rate - find breaking point"
+
+[load]
+target_rps = 0  # Controlled by stress config
+concurrency = 100
+duration_secs = 600
+warmup_secs = 10
+timeout_ms = 10000
+
+[request]
+method = "GET"
+path = "/"
+keep_alive = true
+compression = false
+
+[stress]
+start_rps = 100
+max_rps = 50000
+step = 500
+step_duration_secs = 30
+error_threshold = 5.0
+
+[docker]
+cpu_limit = 1.0
+memory_mb = 256

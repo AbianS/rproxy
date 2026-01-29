@@ -1,0 +1,39 @@
+# API-like workload benchmark scenario
+# Simulates realistic mixed traffic to API endpoints
+
+name = "api-workload"
+description = "Mixed API traffic (GET/POST/PUT/DELETE) - realistic workload"
+
+[load]
+target_rps = 1000
+concurrency = 50
+duration_secs = 180
+warmup_secs = 10
+timeout_ms = 30000
+
+[request]
+method = "GET"
+path = "/api/data"
+body_size = 1024
+keep_alive = true
+compression = true
+headers = [
+    ["Accept", "application/json"],
+    ["X-Request-ID", "benchmark"],
+]
+
+[request.mix]
+get_percent = 60
+post_percent = 25
+put_percent = 10
+delete_percent = 5
+paths = [
+    "/api/users",
+    "/api/products",
+    "/api/orders",
+    "/api/search",
+]
+
+[docker]
+cpu_limit = 1.0
+memory_mb = 256

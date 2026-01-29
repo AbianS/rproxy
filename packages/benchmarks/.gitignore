@@ -1,0 +1,13 @@
+# Build artifacts
+/target/
+
+# Results (except README)
+/results/*
+!/results/.gitkeep
+
+# Editor
+.vscode/
+.idea/
+
+# OS
+.DS_Store

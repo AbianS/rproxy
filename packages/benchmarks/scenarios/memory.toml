@@ -1,0 +1,22 @@
+# Memory leak detection benchmark scenario
+# Long-running test at moderate load
+
+name = "memory"
+description = "Long-running (30 min) at moderate load - memory leak detection"
+
+[load]
+target_rps = 500
+concurrency = 25
+duration_secs = 1800  # 30 minutes
+warmup_secs = 10
+timeout_ms = 30000
+
+[request]
+method = "GET"
+path = "/"
+keep_alive = true
+compression = false
+
+[docker]
+cpu_limit = 1.0
+memory_mb = 256

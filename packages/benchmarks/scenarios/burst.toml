@@ -1,0 +1,28 @@
+# Burst traffic benchmark scenario
+# Tests handling of sudden traffic spikes
+
+name = "burst"
+description = "Traffic spikes (10k requests, pause, repeat) - spike handling"
+
+[load]
+target_rps = 0  # Controlled by burst config
+concurrency = 100
+duration_secs = 120
+warmup_secs = 5
+timeout_ms = 30000
+
+[request]
+method = "GET"
+path = "/"
+keep_alive = true
+compression = false
+
+[burst]
+burst_size = 10000
+burst_count = 5
+pause_secs = 10
+concurrency = 100
+
+[docker]
+cpu_limit = 1.0
+memory_mb = 256

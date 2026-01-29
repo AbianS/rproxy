@@ -1,0 +1,51 @@
+[package]
+name = "rproxy-bench"
+version = "0.1.0"
+edition = "2024"
+description = "Benchmark suite for rproxy - comparing against nginx, traefik, caddy, envoy"
+authors = ["rproxy contributors"]
+
+[dependencies]
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# HTTP client
+reqwest = { version = "0.12", features = ["gzip", "brotli"] }
+
+# CLI
+clap = { version = "4", features = ["derive"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+
+# Docker metrics
+bollard = "0.18"
+
+# Histograms for latency
+hdrhistogram = "7"
+
+# Progress bars
+indicatif = { version = "0.17", features = ["tokio"] }
+
+# Time
+chrono = { version = "0.4", features = ["serde"] }
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Utils
+uuid = { version = "1", features = ["v4"] }
+rand = "0.9"
+futures = "0.3"
+anyhow = "1"
+colored = "3"
+tabled = "0.18"
+byte-unit = { version = "5", features = ["serde"] }
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1

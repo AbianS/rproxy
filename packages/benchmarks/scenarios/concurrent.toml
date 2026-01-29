@@ -1,0 +1,22 @@
+# High concurrency benchmark scenario
+# Tests connection handling under many simultaneous connections
+
+name = "concurrent"
+description = "High concurrency (1k connections) - connection handling"
+
+[load]
+target_rps = 5000
+concurrency = 1000
+duration_secs = 120
+warmup_secs = 10
+timeout_ms = 30000
+
+[request]
+method = "GET"
+path = "/"
+keep_alive = true
+compression = false
+
+[docker]
+cpu_limit = 1.0
+memory_mb = 256

@@ -1,0 +1,37 @@
+# Traefik dynamic configuration for benchmarks
+
+http:
+  routers:
+    proxy:
+      rule: "PathPrefix(`/`)"
+      entryPoints:
+        - web
+      service: upstream
+
+    health:
+      rule: "Path(`/health`)"
+      entryPoints:
+        - web
+      service: health-service
+
+  services:
+    upstream:
+      loadBalancer:
+        servers:
+          - url: "http://upstream:80"
+        passHostHeader: true
+        healthCheck:
+          path: /health
+          interval: "10s"
+          timeout: "3s"
+
+    health-service:
+      loadBalancer:
+        servers:
+          - url: "http://upstream:80"
+
+  middlewares:
+    headers:
+      headers:
+        customRequestHeaders:
+          X-Forwarded-Proto: "http"

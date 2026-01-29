@@ -1,0 +1,25 @@
+{
+  "name": "rproxy-benchmarks",
+  "version": "0.1.0",
+  "description": "Benchmark suite for rproxy reverse proxy",
+  "private": true,
+  "scripts": {
+    "build": "cargo build --release",
+    "setup": "./scripts/setup.sh",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f",
+    "docker:stats": "cargo run --release -- stats",
+    "bench": "cargo run --release -- run -s",
+    "bench:baseline": "cargo run --release -- run -s baseline",
+    "bench:sustained": "cargo run --release -- run -s sustained",
+    "bench:burst": "cargo run --release -- run -s burst",
+    "bench:stress": "cargo run --release -- run -s stress",
+    "bench:memory": "cargo run --release -- run -s memory",
+    "bench:concurrent": "cargo run --release -- run -s concurrent",
+    "bench:all": "./scripts/run-comparison.sh sustained",
+    "compare": "cargo run --release -- compare",
+    "report": "cargo run --release -- report -i results -o results/report.md",
+    "list": "cargo run --release -- list"
+  }
+}

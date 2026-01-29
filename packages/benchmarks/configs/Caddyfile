@@ -1,0 +1,40 @@
+# Caddy reverse proxy configuration for benchmarks
+
+{
+    # Disable admin API
+    admin off
+
+    # Disable automatic HTTPS
+    auto_https off
+
+    # Logging (minimal for benchmarks)
+    log {
+        level ERROR
+    }
+}
+
+:8083 {
+    # Health check endpoint
+    handle /health {
+        respond "OK" 200
+    }
+
+    # Proxy everything to upstream
+    reverse_proxy upstream:80 {
+        # Connection pooling
+        transport http {
+            keepalive 60s
+            keepalive_idle_conns 256
+        }
+
+        # Headers
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+
+        # Timeouts
+        dial_timeout 30s
+        read_timeout 30s
+        write_timeout 30s
+    }
+}

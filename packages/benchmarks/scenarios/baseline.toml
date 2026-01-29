@@ -1,0 +1,22 @@
+# Baseline benchmark scenario
+# Minimal load to measure base latency with zero contention
+
+name = "baseline"
+description = "Minimal load (1 req/s) - measures base latency with zero contention"
+
+[load]
+target_rps = 1
+concurrency = 1
+duration_secs = 60
+warmup_secs = 5
+timeout_ms = 30000
+
+[request]
+method = "GET"
+path = "/"
+keep_alive = true
+compression = false
+
+[docker]
+cpu_limit = 1.0
+memory_mb = 256

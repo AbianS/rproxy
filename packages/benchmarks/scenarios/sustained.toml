@@ -1,0 +1,22 @@
+# Sustained load benchmark scenario
+# Tests memory stability and steady-state performance
+
+name = "sustained"
+description = "Sustained load (1k req/s for 5 min) - memory stability test"
+
+[load]
+target_rps = 1000
+concurrency = 50
+duration_secs = 300
+warmup_secs = 10
+timeout_ms = 30000
+
+[request]
+method = "GET"
+path = "/"
+keep_alive = true
+compression = false
+
+[docker]
+cpu_limit = 1.0
+memory_mb = 256
