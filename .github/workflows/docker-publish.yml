@@ -1,0 +1,129 @@
+name: Docker Publish
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  packages: write
+  pages: write
+  id-token: write
+
+jobs:
+  detect-package:
+    runs-on: ubuntu-latest
+    outputs:
+      is_server: ${{ steps.check.outputs.is_server }}
+      is_docs: ${{ steps.check.outputs.is_docs }}
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - name: Detect package from release tag
+        id: check
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          echo "Release tag: $TAG"
+
+          VERSION=$(echo "$TAG" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+          if [[ "$TAG" == *"rproxy"* ]] && [[ "$TAG" != *"docs"* ]]; then
+            echo "is_server=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_server=false" >> $GITHUB_OUTPUT
+          fi
+
+          if [[ "$TAG" == *"docs"* ]]; then
+            echo "is_docs=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_docs=false" >> $GITHUB_OUTPUT
+          fi
+
+  # Build server on native runners (no QEMU, no cross-compilation)
+  docker-server-build:
+    needs: detect-package
+    if: needs.detect-package.outputs.is_server == 'true'
+    strategy:
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-latest
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: ./apps/server
+          platforms: ${{ matrix.platform }}
+          push: true
+          tags: abians7/rproxy:${{ needs.detect-package.outputs.version }}-${{ matrix.runner }}
+          cache-from: type=gha,scope=server-${{ matrix.runner }}
+          cache-to: type=gha,mode=max,scope=server-${{ matrix.runner }}
+          provenance: false
+
+  # Merge into multi-arch manifest
+  docker-server-manifest:
+    needs: [detect-package, docker-server-build]
+    if: needs.detect-package.outputs.is_server == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Create and push manifest
+        run: |
+          VERSION="${{ needs.detect-package.outputs.version }}"
+
+          docker manifest create abians7/rproxy:v${VERSION} \
+            abians7/rproxy:${VERSION}-ubuntu-latest \
+            abians7/rproxy:${VERSION}-ubuntu-24.04-arm
+          docker manifest push abians7/rproxy:v${VERSION}
+
+          docker manifest create abians7/rproxy:latest \
+            abians7/rproxy:${VERSION}-ubuntu-latest \
+            abians7/rproxy:${VERSION}-ubuntu-24.04-arm
+          docker manifest push abians7/rproxy:latest
+
+  # Deploy docs to GitHub Pages
+  deploy-docs:
+    needs: detect-package
+    if: needs.detect-package.outputs.is_docs == 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build docs
+        run: pnpm build:docs
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: apps/docs/out
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

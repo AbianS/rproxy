@@ -1,0 +1,93 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.PAT_TOKEN }}
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Check if this is a version commit (no changesets = versions were just bumped)
+      - name: Check for changesets
+        id: check
+        run: |
+          # Count changeset files (excluding README.md and config.json)
+          CHANGESETS=$(ls .changeset/*.md 2>/dev/null | grep -v README.md | wc -l | tr -d ' ')
+          echo "changesets_count=$CHANGESETS"
+
+          if [ "$CHANGESETS" -eq "0" ]; then
+            echo "has_changesets=false" >> $GITHUB_OUTPUT
+            echo "📦 No changesets found - this might be a version commit"
+          else
+            echo "has_changesets=true" >> $GITHUB_OUTPUT
+            echo "📝 Found $CHANGESETS changeset(s)"
+          fi
+
+      # If there ARE changesets, create/update the Version Packages PR
+      - name: Create Release Pull Request
+        if: steps.check.outputs.has_changesets == 'true'
+        uses: changesets/action@v1
+        with:
+          version: pnpm changeset version
+          title: "chore: version packages"
+          commit: "chore: version packages"
+        env:
+          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
+
+      # If there are NO changesets, we just merged a version PR - create releases
+      - name: Get changed packages and create releases
+        if: steps.check.outputs.has_changesets == 'false'
+        run: |
+          # Server
+          SERVER_VERSION=$(node -p "require('./apps/server/package.json').version")
+          SERVER_TAG="rproxy@$SERVER_VERSION"
+          if ! git tag -l | grep -q "^$SERVER_TAG$"; then
+            echo "Creating release for $SERVER_TAG"
+            git tag "$SERVER_TAG"
+            git push origin "$SERVER_TAG"
+            gh release create "$SERVER_TAG" \
+              --title "🚀 rproxy v$SERVER_VERSION" \
+              --notes "Release of rproxy version $SERVER_VERSION" \
+              --latest=true
+          else
+            echo "Tag $SERVER_TAG already exists, skipping"
+          fi
+
+          # Docs
+          DOCS_VERSION=$(node -p "require('./apps/docs/package.json').version")
+          DOCS_TAG="docs@$DOCS_VERSION"
+          if ! git tag -l | grep -q "^$DOCS_TAG$"; then
+            echo "Creating release for $DOCS_TAG"
+            git tag "$DOCS_TAG"
+            git push origin "$DOCS_TAG"
+            gh release create "$DOCS_TAG" \
+              --title "📚 docs v$DOCS_VERSION" \
+              --notes "Release of docs version $DOCS_VERSION" \
+              --latest=false
+          else
+            echo "Tag $DOCS_TAG already exists, skipping"
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}

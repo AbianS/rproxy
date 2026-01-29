@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  SCCACHE_GHA_ENABLED: "true"
+  RUSTC_WRAPPER: "sccache"
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Rust setup + caching
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: mozilla-actions/sccache-action@v0.0.9
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/server -> target
+
+      # Node setup + caching
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "latest"
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Run all checks
+      - name: Check formatting
+        run: cd apps/server && cargo fmt --check
+
+      - name: Clippy
+        run: cd apps/server && cargo clippy -- -D warnings
+
+      - name: Run tests
+        run: cd apps/server && cargo test
+
+      - name: Build release
+        run: cd apps/server && cargo build --release
