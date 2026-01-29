@@ -1,5 +1,11 @@
 # docs
 
+## 0.1.2
+
+### Patch Changes
+
+- [`86c77d2`](https://github.com/AbianS/rproxy/commit/86c77d287711829c106b8a66b390546583c79a28) Thanks [@AbianS](https://github.com/AbianS)! - chore: first release docs
+
 ## 0.1.1
 
 ### Patch Changes
