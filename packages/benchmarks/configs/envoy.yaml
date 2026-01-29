@@ -48,7 +48,6 @@ static_resources:
       connect_timeout: 30s
       type: STRICT_DNS
       lb_policy: ROUND_ROBIN
-      http2_protocol_options: {}
       load_assignment:
         cluster_name: upstream_cluster
         endpoints:

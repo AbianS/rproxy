@@ -1,0 +1,19 @@
+# Quick benchmark - 30 seconds, good enough for comparison
+name = "quick"
+description = "Quick comparison (1k req/s for 30s) - fast results"
+
+[load]
+target_rps = 1000
+concurrency = 50
+duration_secs = 30
+warmup_secs = 3
+timeout_ms = 30000
+
+[request]
+method = "GET"
+path = "/"
+keep_alive = true
+
+[docker]
+cpu_limit = 1.0
+memory_mb = 256

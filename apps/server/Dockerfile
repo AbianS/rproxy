@@ -13,15 +13,15 @@ COPY Cargo.toml Cargo.lock* ./
 RUN mkdir src && echo "fn main() {}" > src/main.rs
 
 # Build dependencies only (this layer is cached)
-RUN cargo build --release --target x86_64-unknown-linux-musl 2>/dev/null || true
+RUN cargo build --release 2>/dev/null || true
 
 # Copy actual source code
 COPY src ./src
 
-# Build the application
+# Build the application (native musl target on Alpine)
 RUN touch src/main.rs && \
-    cargo build --release --target x86_64-unknown-linux-musl && \
-    strip target/x86_64-unknown-linux-musl/release/rproxy
+    cargo build --release && \
+    strip target/release/rproxy
 
 # Stage 2: Runtime (scratch - minimal image)
 FROM scratch
@@ -30,7 +30,7 @@ FROM scratch
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
 # Copy the binary
-COPY --from=builder /app/target/x86_64-unknown-linux-musl/release/rproxy /rproxy
+COPY --from=builder /app/target/release/rproxy /rproxy
 
 # Expose ports
 EXPOSE 80 443

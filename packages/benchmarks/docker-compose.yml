@@ -17,12 +17,13 @@ services:
           cpus: "2"
           memory: 256M
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:80/health"]
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:80/health"]
       interval: 5s
       timeout: 3s
-      retries: 3
+      retries: 5
+      start_period: 10s
 
-  # rproxy (our Rust proxy)
+  # rproxy (our Rust proxy) - scratch image, no shell tools
   rproxy:
     container_name: bench-rproxy
     build:
@@ -49,11 +50,7 @@ services:
         limits:
           cpus: "1"
           memory: 256M
-    healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/health"]
-      interval: 5s
-      timeout: 3s
-      retries: 3
+    # No healthcheck - scratch image has no shell
 
   # nginx
   nginx:
@@ -74,10 +71,11 @@ services:
           cpus: "1"
           memory: 256M
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8081/health"]
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:8081/health"]
       interval: 5s
       timeout: 3s
-      retries: 3
+      retries: 5
+      start_period: 10s
 
   # traefik
   traefik:
@@ -104,10 +102,11 @@ services:
           cpus: "1"
           memory: 256M
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8082/health"]
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8082/health"]
       interval: 5s
       timeout: 3s
-      retries: 3
+      retries: 5
+      start_period: 10s
 
   # caddy
   caddy:
@@ -128,10 +127,11 @@ services:
           cpus: "1"
           memory: 256M
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8083/health"]
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8083/health"]
       interval: 5s
       timeout: 3s
-      retries: 3
+      retries: 5
+      start_period: 10s
 
   # envoy
   envoy:
@@ -151,11 +151,7 @@ services:
         limits:
           cpus: "1"
           memory: 256M
-    healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8084/health"]
-      interval: 5s
-      timeout: 3s
-      retries: 3
+    # No healthcheck - envoy image has no wget/curl
 
 networks:
   bench-network:
