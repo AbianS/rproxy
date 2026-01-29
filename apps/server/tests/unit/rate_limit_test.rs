@@ -91,7 +91,7 @@ fn test_rate_limiter_localhost() {
 #[case(1, 1)]
 #[case(10, 10)]
 #[case(100, 200)]
-#[case(1000, 2000)]
+#[case(1, 100)] // Low rps ensures no refill during test
 fn test_rate_limiter_various_configs(#[case] rps: u32, #[case] burst: u32) {
     let limiter = create_rate_limiter(rps, burst);
     let ip: IpAddr = "10.0.0.1".parse().unwrap();
@@ -106,7 +106,7 @@ fn test_rate_limiter_various_configs(#[case] rps: u32, #[case] burst: u32) {
         );
     }
 
-    // Next request should be blocked (unless refilled)
+    // Next request should be blocked (no time for refill with low rps)
     assert!(
         limiter.check_key(&ip).is_err(),
         "Request {} should be blocked (over burst)",
